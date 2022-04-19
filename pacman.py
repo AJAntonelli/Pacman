@@ -1,3 +1,4 @@
+# Import the pygame module
 import pygame
 
 # Import random for random numbers
