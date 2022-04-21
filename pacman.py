@@ -31,6 +31,7 @@ class Player(pygame.sprite.Sprite):
         self.surf = pygame.image.load("jet.png").convert()
         self.surf.set_colorkey((255, 255, 255), RLEACCEL)
         self.rect = self.surf.get_rect()
+        self.lives = 3
 
     # Move the sprite based on keypresses
     def update(self, pressed_keys):
@@ -54,8 +55,13 @@ class Player(pygame.sprite.Sprite):
             self.rect.top = 0
         elif self.rect.bottom >= SCREEN_HEIGHT:
             self.rect.bottom = SCREEN_HEIGHT
+    def slow(self):
+        clock.tick(20)
+    def start(self):
+        if pygame.sprite.spritecollideany(player, enemies):
+            self.rect = screen.blit(self.surf, (random.randint(0,10), (random.randint(0, SCREEN_HEIGHT))))
 
-
+    
 # Define the enemy object extending pygame.sprite.Sprite
 # Instead of a surface, we use an image for a better looking sprite
 class Enemy(pygame.sprite.Sprite):
@@ -102,6 +108,25 @@ class Cloud(pygame.sprite.Sprite):
         if self.rect.right < 0:
             self.kill()
 
+class Bird(pygame.sprite.Sprite):
+    def __init__(self):
+        super(Bird, self).__init__()
+        self.surf = pygame.transform.scale(pygame.image.load("bird.png").convert(), (40,40))
+
+        self.surf.set_colorkey((0, 0, 0), RLEACCEL)
+        # The starting position is randomly generated
+        self.rect = self.surf.get_rect(
+            center=(
+                random.randint(SCREEN_WIDTH + 20, SCREEN_WIDTH + 100),
+                random.randint(0, SCREEN_HEIGHT),
+            )
+        )
+        self.speed = random.randint(5, 20)
+
+    def update(self):
+        self.rect.move_ip(-self.speed, 0)
+        if self.rect.right < 0:
+            self.kill()
 
 # Setup for sounds, defaults are good
 pygame.mixer.init()
@@ -115,12 +140,20 @@ clock = pygame.time.Clock()
 # Create the screen object
 # The size is determined by the constant SCREEN_WIDTH and SCREEN_HEIGHT
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+#pygame.display.set_caption("First Game")
+LIVES_FONT = pygame.font.SysFont('comicsans', 15)
+Lives_text = LIVES_FONT.render("You are starting with 3 lives", 1, (0,0,0))
+
+
+
 
 # Create custom events for adding a new enemy and cloud
 ADDENEMY = pygame.USEREVENT + 1
 pygame.time.set_timer(ADDENEMY, 250)
 ADDCLOUD = pygame.USEREVENT + 2
 pygame.time.set_timer(ADDCLOUD, 1000)
+ADDBIRD = pygame.USEREVENT + 3
+pygame.time.set_timer(ADDBIRD, 5000)
 
 # Create our 'player'
 player = Player()
@@ -131,6 +164,7 @@ player = Player()
 # - all_sprites isused for rendering
 enemies = pygame.sprite.Group()
 clouds = pygame.sprite.Group()
+birds = pygame.sprite.Group()
 all_sprites = pygame.sprite.Group()
 all_sprites.add(player)
 
@@ -153,7 +187,6 @@ collision_sound.set_volume(0.5)
 
 # Variable to keep our main loop running
 running = True
-
 # Our main loop
 while running:
     # Look at every event in the queue
@@ -182,6 +215,15 @@ while running:
             clouds.add(new_cloud)
             all_sprites.add(new_cloud)
 
+        elif event.type == ADDBIRD:
+            new_bird = Bird()
+            birds.add(new_bird)
+            all_sprites.add(new_bird)
+            
+            
+        pygame.display.update()
+
+
     # Get the set of keys pressed and check for user input
     pressed_keys = pygame.key.get_pressed()
     player.update(pressed_keys)
@@ -189,29 +231,42 @@ while running:
     # Update the position of our enemies and clouds
     enemies.update()
     clouds.update()
+    birds.update()
 
     # Fill the screen with sky blue
     screen.fill((135, 206, 250))
-
     # Draw all our sprites
     for entity in all_sprites:
         screen.blit(entity.surf, entity.rect)
+        screen.blit(Lives_text,(600, 550))
 
     # Check if any enemies have collided with the player
     if pygame.sprite.spritecollideany(player, enemies):
         # If so, remove the player
-        player.kill()
+        player.start()
+        player.lives -= 1
+        #player.kill()
 
         # Stop any moving sounds and play the collision sound
-        move_up_sound.stop()
-        move_down_sound.stop()
+        #move_up_sound.stop()
+        #move_down_sound.stop()
         collision_sound.play()
 
         # Stop the loop
-        running = False
+        #running = False
 
+    elif pygame.sprite.spritecollideany(player, birds):
+        player.slow()
+
+    elif player.lives == 0:
+        player.kill()
+        move_up_sound.stop()
+        move_down_sound.stop()
+        collision_sound.play()
+        running = False
     # Flip everything to the display
     pygame.display.flip()
+    
 
     # Ensure we maintain a 30 frames per second rate
     clock.tick(30)
